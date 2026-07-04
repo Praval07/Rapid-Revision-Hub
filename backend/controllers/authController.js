@@ -3,8 +3,14 @@ const jwt = require('jsonwebtoken');
 const memoryDb = require('../utils/memoryDb');
 const bcrypt = require('bcryptjs');
 
-const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+const generateToken = (id) => {
+  if (!process.env.JWT_SECRET) {
+    const error = new Error('Server configuration error.');
+    error.statusCode = 500;
+    throw error;
+  }
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+};
 
 const formatUser = (user) => ({
   id: user._id,
@@ -117,7 +123,7 @@ const register = async (req, res) => {
     if (error.code === 11000) {
       return res.status(400).json({ success: false, message: 'Email is already registered.' });
     }
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
   }
 };
 
@@ -172,7 +178,7 @@ const login = async (req, res) => {
       user: formatUser(user),
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
   }
 };
 

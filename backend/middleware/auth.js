@@ -3,6 +3,10 @@ const User = require('../models/User');
 const memoryDb = require('../utils/memoryDb');
 
 const protect = async (req, res, next) => {
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ success: false, message: 'Server configuration error.' });
+  }
+
   let token;
 
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -38,6 +42,10 @@ const protect = async (req, res, next) => {
 };
 
 const optionalProtect = async (req, res, next) => {
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ success: false, message: 'Server configuration error.' });
+  }
+
   let token;
 
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
