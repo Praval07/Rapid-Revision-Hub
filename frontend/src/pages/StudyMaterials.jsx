@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import {
   FiSearch, FiDownload, FiBookmark, FiFilter,
   FiPlus, FiX, FiBook
@@ -113,11 +114,18 @@ const ResourceCard = ({ resource }) => {
 };
 
 const StudyMaterials = () => {
+  const { user, isGuest } = useAuth();
   const [resources, setResources] = useState(mockResources);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [loading, setLoading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+
+  // Upload Form states
+  const [form, setForm] = useState({ title: '', description: '', category: 'DSA', type: 'pdf', fileUrl: '', tags: '' });
+  const [uploadError, setUploadError] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState('');
+  const [uploadLoading, setUploadLoading] = useState(false);
 
   useEffect(() => {
     const fetchResources = async () => {
@@ -137,6 +145,37 @@ const StudyMaterials = () => {
     const timeout = setTimeout(fetchResources, 400);
     return () => clearTimeout(timeout);
   }, [search, activeCategory]);
+
+  const handleUploadSubmit = async (e) => {
+    e.preventDefault();
+    setUploadError('');
+    setUploadSuccess('');
+    setUploadLoading(true);
+
+    try {
+      const tagsArray = form.tags.split(',').map(t => t.trim()).filter(Boolean);
+      const payload = { ...form, tags: tagsArray };
+      const res = await axios.post('/api/resources', payload);
+      
+      if (res.data.success) {
+        setUploadSuccess('Resource uploaded successfully! Refreshing list...');
+        setForm({ title: '', description: '', category: 'DSA', type: 'pdf', fileUrl: '', tags: '' });
+        
+        // Refresh resources list
+        const updated = await axios.get('/api/resources');
+        if (updated.data.resources) setResources(updated.data.resources);
+        
+        setTimeout(() => {
+          setShowUpload(false);
+          setUploadSuccess('');
+        }, 1500);
+      }
+    } catch (err) {
+      setUploadError(err.response?.data?.message || 'Failed to upload resource. Please try again.');
+    } finally {
+      setUploadLoading(false);
+    }
+  };
 
   const filtered = resources.filter(r => {
     const matchesSearch = !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.description?.toLowerCase().includes(search.toLowerCase());
@@ -235,6 +274,150 @@ const StudyMaterials = () => {
           </AnimatePresence>
         </motion.div>
       )}
+
+      {/* Upload Modal */}
+      <AnimatePresence>
+        {showUpload && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700/80 rounded-3xl p-6 w-full max-w-lg shadow-2xl relative"
+            >
+              <button
+                onClick={() => { setShowUpload(false); setUploadError(''); setUploadSuccess(''); }}
+                className="absolute right-4 top-4 p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer"
+              >
+                <FiX size={18} />
+              </button>
+
+              <h2 className="text-xl font-bold font-poppins text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <FiPlus className="text-blue-500" /> Upload Study Resource
+              </h2>
+
+              {isGuest ? (
+                <div className="py-8 text-center space-y-4">
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">
+                    Only registered students can upload resources to the community.
+                  </p>
+                  <a
+                    href="/login"
+                    className="inline-block px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md"
+                  >
+                    Sign In or Register
+                  </a>
+                </div>
+              ) : (
+                <form onSubmit={handleUploadSubmit} className="space-y-4">
+                  {uploadError && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-500 text-xs">
+                      {uploadError}
+                    </div>
+                  )}
+                  {uploadSuccess && (
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-500 text-xs animate-pulse">
+                      {uploadSuccess}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={form.title}
+                      onChange={e => setForm({ ...form, title: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      placeholder="e.g. DBMS Normalization Guide"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Description *</label>
+                    <textarea
+                      required
+                      rows={3}
+                      value={form.description}
+                      onChange={e => setForm({ ...form, description: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      placeholder="Summarize the contents of this resource..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Category *</label>
+                      <select
+                        value={form.category}
+                        onChange={e => setForm({ ...form, category: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none"
+                      >
+                        {['DSA', 'DBMS', 'OS', 'CN', 'Python', 'Java', 'React', 'Node.js', 'MongoDB', 'Programming', 'Web Development'].map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Type *</label>
+                      <select
+                        value={form.type}
+                        onChange={e => setForm({ ...form, type: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none"
+                      >
+                        {['pdf', 'notes', 'link', 'zip'].map(t => (
+                          <option key={t} value={t}>{t.toUpperCase()}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">File / Drive Link *</label>
+                    <input
+                      type="url"
+                      required
+                      value={form.fileUrl}
+                      onChange={e => setForm({ ...form, fileUrl: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      placeholder="https://drive.google.com/file/d/..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Tags (Comma separated)</label>
+                    <input
+                      type="text"
+                      value={form.tags}
+                      onChange={e => setForm({ ...form, tags: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      placeholder="e.g. database, normalization, aktu"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowUpload(false)}
+                      className="px-4 py-2 rounded-xl text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm font-semibold transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={uploadLoading}
+                      className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-md transition-all disabled:opacity-60 cursor-pointer"
+                    >
+                      {uploadLoading ? 'Uploading...' : 'Submit Resource'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
