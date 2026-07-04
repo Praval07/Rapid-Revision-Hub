@@ -38,7 +38,12 @@ app.get('/api/health', (req, res) => {
     status: 'OK', 
     message: 'Rapid Revision Hub AI API is running! 🚀', 
     timestamp: new Date().toISOString(),
-    sdg: 'SDG 4 — Quality Education'
+    sdg: 'SDG 4 — Quality Education',
+    env: {
+      jwtSecret: !!process.env.JWT_SECRET,
+      mongodbUri: !!process.env.MONGODB_URI,
+      geminiApiKey: !!process.env.GEMINI_API_KEY
+    }
   });
 });
 
@@ -55,6 +60,9 @@ app.listen(PORT, () => {
   console.log(`🚀 Rapid Revision Hub AI Server running on http://localhost:${PORT}`);
   console.log(`📚 SDG 4 — Quality Education Platform`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+  console.log(`✓ JWT_SECRET Loaded: ${!!process.env.JWT_SECRET}`);
+  console.log(`✓ MONGODB_URI Loaded: ${!!process.env.MONGODB_URI}`);
+  console.log(`✓ GEMINI_API_KEY Loaded: ${!!process.env.GEMINI_API_KEY}`);
 });
 
 module.exports = app;
